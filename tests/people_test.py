@@ -13,8 +13,10 @@ def test_read_all_has_kent():
 
     assert_that(response.status_code).is_equal_to(200)
     first_names = [people['fname'] for people in response_text]
-    assert_that(first_names).contains('Bunny')
-
+    # assert_that(first_names).contains('Kent')
+    
+    # Same option with assertpy extracting the first name from the response
+    assert_that(response_text).extracting('fname').contains('Kent')
 
 def test_new_person_can_be_added():
     unique_last_name = create_new_unique_user()
