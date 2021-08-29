@@ -8,6 +8,8 @@ pytest = "*"
 requests = "*"
 assertpy = "*"
 lxml = "*"
+jsonpath-ng = "*"
+cerberus = "*"
 
 [dev-packages]
 rope = "*"
