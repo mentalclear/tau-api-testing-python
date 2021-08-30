@@ -10,6 +10,7 @@ def read_file(file_name):
     with path.open(mode='r') as f:
         return json.load(f)
 
+
 def get_file_with_json_extension(file_name):
     if '.json' in file_name:
         path = BASE_PATH.joinpath(file_name)

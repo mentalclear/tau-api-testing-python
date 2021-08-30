@@ -1,123 +1,51 @@
 import requests
-from assertpy.assertpy import assert_that
-from json import dumps, loads
-from config import BASE_URI
-from utils.print_helpers import pretty_print
-from uuid import uuid4
-import pytest
-import random
-from utils.file_reader import read_file
-from jsonpath_ng import parse
+
+from clients.people.people_client import PeopleClient
+from tests.assertions.people_assertions import *
+from tests.helpers.people_helpers import *
+
+client = PeopleClient()
 
 
 def test_read_all_has_kent():
-    response_text, response = get_all_users()
-    pretty_print(response_text)
+    response = client.read_all_persons()
 
-    assert_that(response.status_code).is_equal_to(200)
-    first_names = [people['fname'] for people in response_text]
-    # assert_that(first_names).contains('Kent')
-    
-    # Same option with assertpy extracting the first name from the response
-    assert_that(response_text).extracting('fname').contains('Kent')
+    assert_that(response.status_code).is_equal_to(requests.codes.ok)
+    assert_people_have_person_with_first_name(response, first_name='Kent')
+
+
+def test_read_one_person():
+    response = client.read_one_person_by_id(1)
+    assert_that(response.status_code).is_equal_to(requests.codes.ok) 
+    assert_that(response.text).contains('Doug')
+
 
 def test_new_person_can_be_added():
-    unique_last_name = create_new_unique_user()
+    last_name, response = client.create_person()
+    assert_that(response.status_code, description='Person not created').is_equal_to(requests.codes.no_content)
 
-    people = requests.get(BASE_URI).json()
-    is_new_user_created = filter(lambda person: person['lname'] == unique_last_name, people)
-    assert_that(is_new_user_created).is_true()
-
-
-def test_person_can_be_deleted():
-    new_user_last_name = create_new_unique_user()
-    all_users, _ = get_all_users()
-    new_user = search_user_by_last_name(all_users, new_user_last_name)[0]
-
-    print(new_user)
-    person_to_be_deleted = new_user['person_id']
-
-    url = f'{BASE_URI}/{person_to_be_deleted}'
-    response= requests.delete(url)
-
-    assert_that(response.status_code).is_equal_to(200)
-
-def create_new_unique_user():
-    unique_last_name = f'User {str(uuid4())}'
-    payload = dumps({
-        'fname': 'New',
-        'lname': unique_last_name
-    })
-
-    headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-    }
-
-    response = requests.post(url=BASE_URI, data=payload, headers=headers)
-    assert_that(response.status_code).is_equal_to(204)
-    return unique_last_name
-
-def get_all_users():
-    response = requests.get(BASE_URI)
-    response_text = response.json()
-    return response_text, response
-
-def search_user_by_last_name(response_text, last_name):
-    return [person for person in response_text if person['lname'] == last_name]
+    peoples = client.read_all_persons().as_dict
+    is_new_user_created = search_created_user_in(peoples, last_name)
+    assert_person_is_present(is_new_user_created)
 
 
-@pytest.fixture
-def create_data():
-    payload = read_file('create_person.json')
+def test_created_person_can_be_deleted():
+    persons_last_name, _ = client.create_person()
 
-    random_no = random.randint(0, 1000)
-    last_name = f'Olabini{random_no}'
+    peoples = client.read_all_persons().as_dict
+    new_person_id = search_created_user_in(peoples, persons_last_name)['person_id']
 
-    payload['lname'] = last_name
-    yield payload
+    response = client.delete_person(new_person_id)
+    assert_that(response.status_code).is_equal_to(requests.codes.ok)
 
 
 def test_person_can_be_added_with_a_json_template(create_data):
-    create_person_with_unique_last_name(create_data)
+    client.create_person(create_data)
 
-    response = requests.get(BASE_URI)
-    peoples = loads(response.text)
+    response = client.read_all_persons()
+    peoples = response.as_dict
 
-    # Get all last names for any object in the root array
-    # Here $ = root, [*] represents any element in the array
-    # Read full syntax: https://pypi.org/project/jsonpath-ng/
-    jsonpath_expr = parse("$.[*].lname")
-    result = [match.value for match in jsonpath_expr.find(peoples)]
+    result = search_nodes_using_json_path(peoples, json_path="$.[*].lname")
 
     expected_last_name = create_data['lname']
     assert_that(result).contains(expected_last_name)
-
-
-def create_person_with_unique_last_name(body=None):
-    if body is None:
-        # Ensure a user with a unique last name is created everytime the test runs
-        # Note: json.dumps() is used to convert python dict to json string
-        unique_last_name = f'User {str(uuid4())}'
-        payload = dumps({
-            'fname': 'New',
-            'lname': unique_last_name
-        })
-    else:
-        unique_last_name = body['lname']
-        payload = dumps(body)
-
-    # Setting default headers to show that the client accepts json
-    # And will send json in the headers
-    headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-    }
-
-    # We use requests.post method with keyword params to make the request more readable
-    response = requests.post(url=BASE_URI, data=payload, headers=headers)
-    assert_that(response.status_code, description='Person not created').is_equal_to(requests.codes.no_content)
-    return unique_last_name
-
-def search_created_user_in(peoples, last_name):
-    return [person for person in peoples if person['lname'] == last_name]

@@ -13,6 +13,7 @@ schema = {
     "timestamp": {'type': 'string'}
 }
 
+
 def test_read_one_operation_has_expected_schema():
     response = requests.get(f'{BASE_URI}/1')
     person = json.loads(response.text)
