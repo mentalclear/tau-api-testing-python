@@ -10,6 +10,7 @@ assertpy = "*"
 lxml = "*"
 jsonpath-ng = "*"
 cerberus = "*"
+pytest-xdist = {extras = ["psutil"], version = "*"}
 
 [dev-packages]
 rope = "*"
